@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ComCLIP · NeurIPS 2026</title>
+<meta name="description" content="Rethinking Contrastive Loss in CLIP Post-training: A Complementary Framework with Frozen Text Encoder (NeurIPS 2026). With a small contrastive temperature, contrastive post-training improves rather than degrades CLIP.">
+<meta property="og:title" content="ComCLIP: Rethinking Contrastive Loss in CLIP Post-training">
+<meta property="og:description" content="Temperature, not batch size, drives forgetting in contrastive CLIP post-training. ComCLIP: a single-epoch, frozen-text-encoder recipe. NeurIPS 2026.">
+<meta property="og:image" content="https://showstarpro.github.io/ComCLIP/static/images/framework.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232a78d6'/><text x='16' y='22' font-family='Arial' font-weight='700' font-size='15' fill='white' text-anchor='middle'>CC</text></svg>">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-2: #f2f1ed;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11,11,11,0.10);
+  --accent: #2a78d6;
+  --accent-ink: #1c5cab;
+  --accent-wash: #e8f1fc;
+  --series-1: #2a78d6;
+  --good: #006300;
+  --bad: #b3261e;
+  --figure-bg: #ffffff;
+  --code-bg: #f2f1ed;
+  --shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-2: #232321;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255,255,255,0.10);
+    --accent: #3987e5;
+    --accent-ink: #86b6ef;
+    --accent-wash: #16263a;
+    --series-1: #3987e5;
+    --good: #0ca30c;
+    --bad: #e66767;
+    --figure-bg: #f4f4f2;
+    --code-bg: #232321;
+    --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #232321;
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255,255,255,0.10);
+  --accent: #3987e5;
+  --accent-ink: #86b6ef;
+  --accent-wash: #16263a;
+  --series-1: #3987e5;
+  --good: #0ca30c;
+  --bad: #e66767;
+  --figure-bg: #f4f4f2;
+  --code-bg: #232321;
+  --shadow: none;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.wrap { max-width: 960px; margin: 0 auto; padding: 0 16px; }
+.narrow { max-width: 760px; margin-left: auto; margin-right: auto; }
+
+/* ---------- hero ---------- */
+header.hero { padding: 64px 0 36px; text-align: center; }
+.venue {
+  display: inline-block; font-size: 13px; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--accent-ink); background: var(--accent-wash);
+  padding: 4px 12px; border-radius: 999px; margin-bottom: 20px;
+}
+h1.title {
+  font-size: clamp(28px, 4.6vw, 44px); line-height: 1.15; font-weight: 700;
+  letter-spacing: -0.02em; margin: 0 auto 8px; max-width: 900px; text-wrap: balance;
+}
+h1.title .name { color: var(--accent); }
+.subtitle { font-size: clamp(17px, 2.2vw, 21px); color: var(--ink-2); margin: 0 auto 28px; max-width: 760px; line-height: 1.4; }
+.authors { font-size: 18px; margin: 0 0 6px; }
+.authors span { display: inline-block; margin: 0 10px; white-space: nowrap; }
+.affil { color: var(--ink-2); font-size: 15px; margin: 0 0 4px; }
+.affil span { display: inline-block; margin: 0 10px; }
+.notes { color: var(--muted); font-size: 13.5px; margin: 0 0 28px; }
+.buttons { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px;
+  border-radius: 999px; background: var(--ink); color: var(--page);
+  font-weight: 600; font-size: 15px; border: 1px solid transparent;
+  transition: transform .12s ease, opacity .12s ease;
+}
+.btn:hover { text-decoration: none; transform: translateY(-1px); opacity: .9; }
+.btn.ghost { background: transparent; color: var(--ink); border-color: var(--border); }
+.btn svg { width: 17px; height: 17px; flex: none; }
+
+/* ---------- teaser ---------- */
+.teaser {
+  margin: 8px auto 0; background: var(--figure-bg); border: 1px solid var(--border);
+  border-radius: 14px; padding: 18px; box-shadow: var(--shadow);
+}
+.teaser img { display: block; width: 100%; height: auto; }
+.caption { color: var(--ink-2); font-size: 14.5px; line-height: 1.55; margin: 12px auto 0; max-width: 860px; }
+.caption b { color: var(--ink); }
+
+/* ---------- tldr ---------- */
+.tldr {
+  margin: 44px auto 0; padding: 22px 26px; border-radius: 14px;
+  background: var(--accent-wash); border-left: 4px solid var(--accent);
+  font-size: 18px; line-height: 1.55;
+}
+.tldr strong:first-child { color: var(--accent-ink); margin-right: 6px; }
+
+/* ---------- sections ---------- */
+section { padding: 56px 0 8px; }
+h2 { font-size: 28px; letter-spacing: -0.015em; margin: 0 0 18px; line-height: 1.25; }
+h2 .kicker { display: block; font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+h3 { font-size: 19px; margin: 32px 0 10px; }
+p { margin: 0 0 16px; }
+.abstract p { color: var(--ink); text-align: justify; hyphens: auto; }
+.muted { color: var(--ink-2); }
+.small { font-size: 14.5px; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  padding: 22px; box-shadow: var(--shadow);
+}
+.eq {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px 16px; margin: 18px 0; overflow-x: auto; text-align: center;
+}
+
+/* ---------- stats ---------- */
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 24px 0 8px; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.stat .v { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+.stat .v small { font-size: 16px; font-weight: 600; color: var(--ink-2); }
+.stat .l { font-size: 14px; color: var(--ink-2); margin-top: 6px; line-height: 1.4; }
+.up { color: var(--good); }
+.down { color: var(--bad); }
+
+/* ---------- charts ---------- */
+.charts { display: grid; grid-template-columns: 1.25fr 1fr; gap: 14px; margin: 20px 0 6px; }
+.chart { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 14px 10px; position: relative; }
+.chart h4 { margin: 0 4px 2px; font-size: 15px; }
+.chart .sub { margin: 0 4px 6px; font-size: 13px; color: var(--ink-2); }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart svg text { font-family: inherit; }
+.tick { fill: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.axis-title { fill: var(--ink-2); font-size: 12px; }
+.gridline { stroke: var(--grid); stroke-width: 1; }
+.baseline-ref { stroke: var(--ink-2); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.baseline-label { fill: var(--ink-2); font-size: 11.5px; }
+.series-line { fill: none; stroke: var(--series-1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.series-dot { fill: var(--series-1); stroke: var(--surface); stroke-width: 2; }
+.series-dot.bad { fill: var(--surface); stroke: var(--series-1); stroke-width: 2; }
+.point-label { fill: var(--ink); font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.hit { fill: transparent; cursor: default; }
+.tooltip {
+  position: absolute; pointer-events: none; opacity: 0; transition: opacity .08s;
+  background: var(--ink); color: var(--page); font-size: 12.5px; line-height: 1.4;
+  padding: 7px 10px; border-radius: 8px; white-space: nowrap; z-index: 5;
+  transform: translate(-50%, calc(-100% - 12px));
+}
+.tooltip b { font-variant-numeric: tabular-nums; }
+
+/* ---------- loss cards ---------- */
+.losses { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 22px 0 6px; }
+.loss { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+.loss .tag { font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.loss h4 { margin: 4px 0 8px; font-size: 17px; }
+.loss p { font-size: 14.5px; color: var(--ink-2); margin: 0; line-height: 1.55; }
+.loss code { font-size: 12.5px; }
+.loss .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: 0; }
+
+/* ---------- tables ---------- */
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); margin: 16px 0 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { padding: 9px 12px; text-align: center; white-space: nowrap; border-bottom: 1px solid var(--grid); }
+th { font-weight: 600; color: var(--ink-2); font-size: 13px; background: var(--surface-2); }
+thead tr:first-child th { border-bottom-color: var(--grid); }
+td:first-child, th:first-child { text-align: left; }
+tbody tr:last-child td { border-bottom: none; }
+tr.ours td { background: var(--accent-wash); }
+tr.ours td:first-child { font-weight: 600; color: var(--accent-ink); }
+tr.base td { color: var(--ink-2); }
+td .sd { color: var(--muted); font-size: 11.5px; margin-left: 1px; }
+td b { font-weight: 700; }
+table.compact th, table.compact td { padding: 9px 8px; font-size: 13.5px; }
+td u { text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.check { color: var(--accent); font-weight: 700; }
+.dash { color: var(--axis); }
+
+.tabs { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 3px; gap: 2px; }
+.tabs button {
+  font: inherit; font-size: 14px; font-weight: 600; border: 0; background: transparent; color: var(--ink-2);
+  padding: 6px 16px; border-radius: 999px; cursor: pointer;
+}
+.tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.results-grid { display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: 18px; align-items: center; margin-top: 18px; }
+.radar { background: var(--figure-bg); border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
+.radar img { width: 100%; height: auto; display: block; }
+
+.callouts { display: grid; grid-template-columns: 1fr; gap: 14px; }
+.callout { border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; background: var(--surface); font-size: 15px; line-height: 1.55; }
+.callout b { display: block; margin-bottom: 4px; font-size: 15.5px; }
+.callout span { color: var(--ink-2); }
+
+ul.limits { padding-left: 20px; color: var(--ink-2); font-size: 15.5px; }
+ul.limits li { margin-bottom: 8px; }
+
+/* ---------- code ---------- */
+pre {
+  background: var(--code-bg); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px 18px; overflow-x: auto; font-size: 13.5px; line-height: 1.55; margin: 0;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+code { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: .88em; background: var(--code-bg); padding: 1px 5px; border-radius: 5px; }
+pre code { background: none; padding: 0; font-size: inherit; }
+.bib { position: relative; }
+.copy {
+  position: absolute; top: 10px; right: 10px; font: inherit; font-size: 13px; font-weight: 600;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border);
+  border-radius: 8px; padding: 5px 12px; cursor: pointer;
+}
+.copy:hover { border-color: var(--accent); }
+
+footer { margin-top: 64px; padding: 28px 0 48px; border-top: 1px solid var(--border); color: var(--muted); font-size: 14px; text-align: center; }
+
+.theme-toggle {
+  position: fixed; top: 14px; right: 14px; z-index: 10; width: 38px; height: 38px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink); cursor: pointer;
+  display: grid; place-items: center; box-shadow: var(--shadow);
+}
+.theme-toggle svg { width: 18px; height: 18px; }
+
+.katex { font-size: 1.05em; }
+.eq .katex-display { margin: 0; }
+
+@media (max-width: 820px) {
+  .charts, .results-grid { grid-template-columns: 1fr; }
+  .radar { max-width: 360px; margin: 0 auto; }
+  .losses, .stats { grid-template-columns: 1fr; }
+  .callouts { grid-template-columns: 1fr; }
+  header.hero { padding-top: 56px; }
+  body { font-size: 16px; }
+  .abstract p { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+</button>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="venue">NeurIPS 2026</div>
+    <h1 class="title">Rethinking Contrastive Loss in CLIP Post&#8209;training</h1>
+    <p class="subtitle">A Complementary Framework with Frozen Text Encoder &mdash; <b>ComCLIP</b></p>
+
+    <p class="authors">
+      <span>Zidan Wang<sup>1</sup></span>
+      <span>Yaqian Li<sup>2,*</sup></span>
+      <span>Xiaokai Zhang<sup>1</sup></span>
+      <span>Kaiwen Long<sup>2</sup></span>
+      <span>Kun He<sup>1</sup></span>
+      <span>Hanpeng Liu<sup>1,2,*,&dagger;</sup></span>
+    </p>
+    <p class="affil">
+      <span><sup>1</sup>Huazhong University of Science and Technology</span>
+      <span><sup>2</sup>Li Auto Inc.</span>
+    </p>
+    <p class="notes">* Corresponding authors &nbsp;·&nbsp; &dagger; Work done during a research internship at Li Auto Inc.</p>
+
+    <div class="buttons">
+      <a class="btn" href="static/ComCLIP_NeurIPS2026.pdf" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg>
+        Paper
+      </a>
+      <a class="btn" href="https://github.com/showstarpro/ComCLIP" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.78 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.26 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>
+        Code
+      </a>
+      <a class="btn ghost" href="#bibtex">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>
+        BibTeX
+      </a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <figure class="teaser" style="margin-left:0;margin-right:0">
+      <img src="static/images/framework.png" alt="ComCLIP framework: a frozen CLIP text encoder, a trainable CLIP image encoder anchored to a frozen copy, and a frozen DINOv2 encoder providing relational supervision.">
+    </figure>
+    <p class="caption"><b>Overview of ComCLIP.</b> Three branches operate jointly: (i) the frozen CLIP text encoder for image-text alignment (\(\mathcal{L}_{\text{clip}}\)), (ii) the trainable CLIP image encoder anchored to its frozen pretrained counterpart (\(\mathcal{L}_{\text{mse}}\)), and (iii) a frozen DINOv2 encoder providing relational supervision via batch-wise similarity matrices (\(\mathcal{L}_{\text{rkd}}\)). All three losses operate on the post-projection embedding.</p>
+
+    <div class="tldr narrow">
+      <strong>TL;DR</strong> Contrastive post-training of CLIP was thought to fail because small batches give too few negatives. We find the main cause is the <b>temperature</b>: at \(\tau = 0.01\) instead of the inherited \(\tau \approx 0.07\), the same InfoNCE objective <em>improves</em> CLIP. ComCLIP builds on this with a single-epoch, frozen-text-encoder recipe that produces a drop-in vision encoder.
+    </div>
+  </div>
+
+  <section id="abstract">
+    <div class="wrap narrow abstract">
+      <h2>Abstract</h2>
+      <p>CLIP serves as a foundational vision-language model and the de facto vision encoder for downstream VLMs such as LLaVA. Post-training offers a lightweight route to refine CLIP, but recent work argues that the standard contrastive loss is unsuitable for post-training due to catastrophic forgetting under small batches, motivating designs that abandon the contrastive objective in favor of distillation. We revisit this premise and find that, for the InfoNCE objective, the reported forgetting is driven primarily not by insufficient negatives but by an inappropriate magnitude of the contrastive temperature \(\tau\): with \(\tau\) set sufficiently small, contrastive post-training improves rather than degrades the pretrained CLIP, which we explain through the temperature dependence of the InfoNCE gradient.</p>
+      <p>Building on this finding, we propose <b>ComCLIP</b>, a lightweight single-epoch post-training recipe that freezes CLIP's text encoder&mdash;so the refined vision encoder is a drop-in replacement with unchanged architecture and inference cost&mdash;and trains the vision encoder with a properly-tempered contrastive loss, an MSE anchoring loss against the original CLIP, and a relational distillation loss from DINOv2. Over multiple seeds, ComCLIP matches the self-distillation baseline CLIP-Refine on zero-shot classification while significantly improving the transferability of visual features, measured by linear probing (48.99 vs. 42.28 on ViT-B/16), and on ViT-L/14 it also improves MMVP over CLIP-Refine (24.20 vs. 19.01); CLIP-Refine remains stronger on image-text retrieval. Used as a drop-in vision encoder for LLaVA-1.5-7B without re-aligning the projector or LLM, ComCLIP yields no net change across 8 VLM benchmarks, i.e., the refinement does not break downstream compatibility.</p>
+    </div>
+  </section>
+
+  <section id="finding-1">
+    <div class="wrap">
+      <div class="narrow">
+        <h2><span class="kicker">Finding 1</span>Temperature matters more than batch size</h2>
+        <p>Inheriting CLIP's pretraining temperature \(\tau \approx 0.07\) reproduces the catastrophic forgetting reported in prior work. With a substantially smaller \(\tau = 0.01\), the <em>same</em> objective, data and compute improve the pretrained model. Both runs below train ViT-B/16 on CC3M for one epoch with \(\mathcal{L}_{\text{clip}}\) only.</p>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="v">61.82</div><div class="l">OpenAI CLIP ViT-B/16, zero-shot accuracy averaged over 12 datasets</div></div>
+        <div class="stat"><div class="v down">57.90 <small>&minus;3.92</small></div><div class="l">Contrastive post-training at \(\tau = 0.07\) (pretraining init)</div></div>
+        <div class="stat"><div class="v up">62.90 <small>+1.08</small></div><div class="l">Same objective at \(\tau = 0.01\)</div></div>
+      </div>
+
+      <div class="charts">
+        <div class="chart" id="chart-tau">
+          <h4>Sweeping the temperature</h4>
+          <p class="sub">Zero-shot accuracy (12-dataset avg) &middot; batch size 1,024</p>
+          <svg viewBox="0 0 440 270" role="img" aria-label="Zero-shot accuracy versus temperature. tau 0.07: 57.90; 0.03: 61.51; 0.02: 62.57; 0.01: 62.90; 0.007: 62.72; 0.005: 62.36. Baseline 61.82."></svg>
+          <div class="tooltip"></div>
+        </div>
+        <div class="chart" id="chart-bs">
+          <h4>Sweeping the batch size</h4>
+          <p class="sub">Zero-shot accuracy (12-dataset avg) &middot; \(\tau = 0.01\)</p>
+          <svg viewBox="0 0 360 270" role="img" aria-label="Zero-shot accuracy versus batch size at tau 0.01. 128: 62.00; 256: 62.50; 512: 62.65; 1024: 62.69; 2048: 63.03. Baseline 61.82."></svg>
+          <div class="tooltip"></div>
+        </div>
+      </div>
+      <p class="caption" style="margin-left:0">Both panels share one y-axis. Going from batch 128 to 2,048 gains +1.03, while the jump from \(\tau = 0.07\) to \(\tau = 0.01\) is worth +5.00. <b>Every</b> \(50 \le 1/\tau \le 200\) beats the base model, and \(\tau = 0.01\) does so at every batch size tested. Fixed and learnable \(\tau\) differ by at most 0.05. ViT-B/16, CC3M, one epoch, \(\mathcal{L}_{\text{clip}}\) only, single runs.</p>
+
+      <div class="narrow">
+        <h3>Why a small temperature helps</h3>
+        <p>For the image-to-text term of sample \(i\), with similarities \(s_{ij} = \mathbf{u}_i^\top \mathbf{v}_j\) and softmax weights \(p_{ij}\), the gradient with respect to the logits is</p>
+        <div class="eq">$$\frac{\partial \mathcal{L}_i}{\partial s_{ij}} = \frac{1}{\tau}\bigl(p_{ij} - \mathbb{1}[j=i]\bigr), \qquad p_{ij} \le \exp\!\Bigl(-\frac{s_{ii}-s_{ij}}{\tau}\Bigr)\quad (j \neq i).$$</div>
+        <p>A pretrained CLIP already separates most matched pairs from mismatched ones, so the margin \(\Delta_{ij} = s_{ii} - s_{ij}\) is positive for most in-batch negatives. With a <b>small \(\tau\)</b>, \(\Delta_{ij}/\tau\) is large for all but the hardest negatives. The gradient on easy pairs vanishes exponentially, which leaves the pretrained geometry intact, and the update concentrates on the few hard negatives, which refines it. At \(\tau \approx 0.07\), typical margins are of the same order as \(\tau\), so many already-correct pairs keep receiving gradient. The encoder then re-fits the small post-training corpus instead of correcting its remaining errors. This is the forgetting reported in prior work.</p>
+        <p class="muted small">Practical guidance: set \(\tau\) well below the pretraining initialization so that \(\Delta_{ij}/\tau \gg 1\) for most negatives. We fix \(\tau = 0.01\) and transfer it unchanged to ViT-L/14, SigLIP, COCO Caption and CC12M. The analysis is specific to InfoNCE. It does not cover KL-based self-distillation or SigLIP's sigmoid loss.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="method">
+    <div class="wrap">
+      <div class="narrow">
+        <h2><span class="kicker">Method</span>ComCLIP: refine relative structure, anchor absolute geometry</h2>
+        <p>ComCLIP freezes the CLIP text encoder and trains only the vision encoder for <b>one epoch</b> with three losses on the post-projection embedding \(\mathbf{u}\):</p>
+        <div class="eq">$$\mathcal{L}_{\text{ComCLIP}} = \lambda_{\text{clip}}\,\mathcal{L}_{\text{clip}} + \lambda_{\text{mse}}\,\mathcal{L}_{\text{mse}} + \lambda_{\text{rkd}}\,\mathcal{L}_{\text{rkd}}$$</div>
+      </div>
+      <div class="losses">
+        <div class="loss">
+          <div class="tag">Alignment</div>
+          <h4>\(\mathcal{L}_{\text{clip}}\) &middot; tempered InfoNCE</h4>
+          <p>Symmetric InfoNCE against the <b>frozen</b> text encoder, with \(\tau\) fixed at 0.01. It drives zero-shot classification and retrieval.</p>
+        </div>
+        <div class="loss">
+          <div class="tag">Anchoring</div>
+          <h4>\(\mathcal{L}_{\text{mse}}\) &middot; feature anchor</h4>
+          <p>MSE between \(\mathbf{u}(x)\) and the embedding \(\mathbf{u}^0(x)\) of a frozen copy of the original encoder. It stops the encoder from drifting and preserves transferable features.</p>
+        </div>
+        <div class="loss">
+          <div class="tag">Relational distillation</div>
+          <h4>\(\mathcal{L}_{\text{rkd}}\) &middot; DINOv2 relations</h4>
+          <p>Row-wise KL between the batch similarity distributions of CLIP and DINOv2 (\(T = 0.1\)). It transfers DINOv2's view of which images are close to which, without forcing CLIP into DINOv2's coordinates.</p>
+        </div>
+      </div>
+      <p class="caption" style="margin-left:0">The delivered model is a single CLIP vision encoder with the same architecture, parameter count and inference cost as the input model. It can replace CLIP directly, including inside LLaVA-1.5. Training: AdamW, lr \(10^{-6}\), weight decay 0.1, 410 warm-up steps, global batch 1,024, all \(\lambda = 1\).</p>
+    </div>
+  </section>
+
+  <section id="finding-2">
+    <div class="wrap">
+      <div class="narrow">
+        <h2><span class="kicker">Finding 2</span>Each loss moves a different group of metrics</h2>
+        <p>Training every subset of the three losses shows that they act on largely separable metrics. \(\mathcal{L}_{\text{clip}}\) alone raises zero-shot accuracy and retrieval but leaves linear probing flat. \(\mathcal{L}_{\text{mse}}\) alone is a no-op. \(\mathcal{L}_{\text{rkd}}\) alone pulls the embedding away from the text space. Combined, the anchor lets the contrastive signal improve alignment without eroding transferable features.</p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th rowspan="2">Configuration</th><th rowspan="2">\(\mathcal{L}_{\text{clip}}\)</th><th rowspan="2">\(\mathcal{L}_{\text{mse}}\)</th><th rowspan="2">\(\mathcal{L}_{\text{rkd}}\)</th><th>Zero-shot</th><th colspan="2">MS COCO R@1</th><th colspan="2">Flickr30K R@1</th><th>Linear probe</th></tr>
+            <tr><th>12-avg</th><th>I&rarr;T</th><th>T&rarr;I</th><th>I&rarr;T</th><th>T&rarr;I</th><th>5-avg</th></tr>
+          </thead>
+          <tbody>
+            <tr class="base"><td>OpenAI CLIP</td><td class="dash">&ndash;</td><td class="dash">&ndash;</td><td class="dash">&ndash;</td><td>61.82</td><td>48.16</td><td>31.47</td><td>74.70</td><td>57.10</td><td>44.70</td></tr>
+            <tr><td>Contrastive only</td><td class="check">&check;</td><td class="dash">&ndash;</td><td class="dash">&ndash;</td><td>62.90</td><td>51.92</td><td><b>38.28</b></td><td>76.80</td><td><b>64.56</b></td><td>44.04</td></tr>
+            <tr><td>Anchor only</td><td class="dash">&ndash;</td><td class="check">&check;</td><td class="dash">&ndash;</td><td>61.82</td><td>48.18</td><td>31.45</td><td>74.70</td><td>57.12</td><td>44.79</td></tr>
+            <tr><td>Relational only</td><td class="dash">&ndash;</td><td class="dash">&ndash;</td><td class="check">&check;</td><td>56.64</td><td>43.30</td><td>25.57</td><td>69.30</td><td>49.66</td><td>44.42</td></tr>
+            <tr><td>Anchor + relational</td><td class="dash">&ndash;</td><td class="check">&check;</td><td class="check">&check;</td><td>61.36</td><td>49.98</td><td>31.53</td><td>75.40</td><td>58.08</td><td>45.50</td></tr>
+            <tr><td>Contrastive + anchor</td><td class="check">&check;</td><td class="check">&check;</td><td class="dash">&ndash;</td><td><b>63.35</b></td><td>51.64</td><td>37.03</td><td>77.00</td><td>64.34</td><td>48.60</td></tr>
+            <tr><td>Contrastive + relational</td><td class="check">&check;</td><td class="dash">&ndash;</td><td class="check">&check;</td><td>62.49</td><td>51.50</td><td>36.67</td><td>77.30</td><td>63.96</td><td>47.15</td></tr>
+            <tr class="ours"><td>ComCLIP (all three)</td><td class="check">&check;</td><td class="check">&check;</td><td class="check">&check;</td><td>63.15</td><td><b>52.20</b></td><td>36.18</td><td><b>77.80</b></td><td>63.22</td><td><b>48.74</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="caption" style="margin-left:0">Loss decoupling on ViT-B/16, CC3M, one epoch, \(\tau = 0.01\), single runs. Best per column in bold. In a 3-seed control, adding \(\mathcal{L}_{\text{rkd}}\) to \(\mathcal{L}_{\text{clip}} + \mathcal{L}_{\text{mse}}\) significantly improves linear probing on ViT-L/14 (56.36 &rarr; 57.12, \(p \approx 0.013\)). On ViT-B/16 the gain has the same sign but is not significant.</p>
+    </div>
+  </section>
+
+  <section id="results">
+    <div class="wrap">
+      <div class="narrow">
+        <h2><span class="kicker">Results</span>Better transferable features at zero-shot parity</h2>
+        <p>ComCLIP and the self-distillation baseline CLIP-Refine sit at different points of a trade-off. On ViT-B/16 over three seeds, the two are at parity on zero-shot classification (63.00 vs. 62.87, \(p = 0.26\)). CLIP-Refine is ahead on retrieval, and ComCLIP is far ahead on linear probing (48.99 vs. 42.28, \(p &lt; 0.001\)). CLIP-Refine pushes linear probing <em>below</em> the original CLIP, while ComCLIP raises it.</p>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-top:22px">
+        <div class="tabs" role="tablist" aria-label="Backbone">
+          <button role="tab" aria-selected="true" data-tab="b16">ViT-B/16</button>
+          <button role="tab" aria-selected="false" data-tab="l14">ViT-L/14</button>
+        </div>
+        <span class="muted small">Training data in parentheses &middot; \(\pm\) = std over 3 seeds</span>
+      </div>
+
+                <div class="table-wrap" data-panel="b16">
+            <table>
+              <thead>
+                <tr><th rowspan="2">Method</th><th>Zero-shot</th><th colspan="2">MS COCO R@1</th><th colspan="2">Flickr30K R@1</th><th>Lin. probe</th><th>MMVP</th></tr>
+                <tr><th>12-avg</th><th>I&rarr;T</th><th>T&rarr;I</th><th>I&rarr;T</th><th>T&rarr;I</th><th>5-avg</th><th>avg</th></tr>
+              </thead>
+              <tbody>
+                <tr class="base"><td>OpenAI CLIP</td><td>61.82</td><td>48.16</td><td>31.47</td><td>74.70</td><td>57.10</td><td>44.70</td><td>12.59</td></tr>
+                <tr><td>+ KUEA (IN-1K)</td><td>62.07</td><td>48.48</td><td>31.99</td><td>75.00</td><td>57.62</td><td>44.65</td><td>11.85</td></tr>
+                <tr><td>+ KUEA (CC3M)</td><td>61.99</td><td>48.00</td><td>31.47</td><td>75.00</td><td>57.00</td><td>44.72</td><td>14.07</td></tr>
+                <tr><td>+ CLIP-Refine (COCO)</td><td>62.87<span class="sd">&plusmn;0.11</span></td><td><b>54.17</b><span class="sd">&plusmn;0.28</span></td><td><b>37.72</b><span class="sd">&plusmn;0.07</span></td><td><b>81.30</b><span class="sd">&plusmn;0.40</span></td><td><b>64.45</b><span class="sd">&plusmn;0.21</span></td><td>42.28<span class="sd">&plusmn;0.62</span></td><td><u>16.05</u><span class="sd">&plusmn;1.14</span></td></tr>
+                <tr><td>+ CLIP-Refine (CC3M)</td><td>61.59</td><td>41.12</td><td>33.29</td><td>66.20</td><td>60.18</td><td>44.89</td><td><b>19.26</b></td></tr>
+                <tr class="ours"><td>+ ComCLIP (COCO)</td><td>62.97</td><td>52.24</td><td>35.36</td><td><u>79.50</u></td><td>61.36</td><td><u>47.23</u></td><td>15.56</td></tr>
+                <tr class="ours"><td>+ ComCLIP (CC3M)</td><td><u>63.00</u><span class="sd">&plusmn;0.13</span></td><td><u>52.49</u><span class="sd">&plusmn;0.28</span></td><td><u>36.17</u><span class="sd">&plusmn;0.02</span></td><td>77.80<span class="sd">&plusmn;0.00</span></td><td><u>63.11</u><span class="sd">&plusmn;0.09</span></td><td><b>48.99</b><span class="sd">&plusmn;0.35</span></td><td>14.81<span class="sd">&plusmn;2.97</span></td></tr>
+                <tr class="ours"><td>+ ComCLIP (CC12M)</td><td><b>63.04</b></td><td>51.58</td><td>35.56</td><td>77.10</td><td>62.42</td><td>46.56</td><td>15.56</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="table-wrap" data-panel="l14" hidden>
+            <table>
+              <thead>
+                <tr><th rowspan="2">Method</th><th>Zero-shot</th><th colspan="2">MS COCO R@1</th><th colspan="2">Flickr30K R@1</th><th>Lin. probe</th><th>MMVP</th></tr>
+                <tr><th>12-avg</th><th>I&rarr;T</th><th>T&rarr;I</th><th>I&rarr;T</th><th>T&rarr;I</th><th>5-avg</th><th>avg</th></tr>
+              </thead>
+              <tbody>
+                <tr class="base"><td>OpenAI CLIP</td><td>66.12</td><td>50.04</td><td>34.29</td><td>77.90</td><td>59.80</td><td>54.90</td><td>17.78</td></tr>
+                <tr><td>+ KUEA (IN-1K)</td><td>66.89</td><td>50.88</td><td>35.66</td><td>79.50</td><td>61.18</td><td><b>59.92</b></td><td>17.78</td></tr>
+                <tr><td>+ KUEA (CC3M)</td><td>66.36</td><td>50.30</td><td>34.68</td><td>78.00</td><td>60.02</td><td>55.82</td><td>18.52</td></tr>
+                <tr><td>+ CLIP-Refine (COCO)</td><td>66.31</td><td>53.28</td><td>38.21</td><td>80.10</td><td>64.56</td><td>50.83</td><td>17.04</td></tr>
+                <tr><td>+ CLIP-Refine (CC3M)</td><td class="dash">&ndash;</td><td class="dash">&ndash;</td><td class="dash">&ndash;</td><td class="dash">&ndash;</td><td class="dash">&ndash;</td><td class="dash">&ndash;</td><td>19.01<span class="sd">&plusmn;1.86</span></td></tr>
+                <tr class="ours"><td>+ ComCLIP (COCO)</td><td>67.09</td><td><u>54.32</u></td><td><u>38.79</u></td><td><u>81.80</u></td><td>64.98</td><td><u>58.28</u></td><td>20.74</td></tr>
+                <tr class="ours"><td>+ ComCLIP (CC3M)</td><td><u>67.75</u></td><td><b>54.56</b></td><td><b>39.40</b></td><td><b>82.60</b></td><td><b>65.82</b></td><td>56.99</td><td><b>24.20</b><span class="sd">&plusmn;0.86</span></td></tr>
+                <tr class="ours"><td>+ ComCLIP (CC12M)</td><td><b>67.78</b></td><td>53.74</td><td>38.63</td><td>80.10</td><td><u>65.00</u></td><td>57.42</td><td><u>22.22</u></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="caption" style="margin-left:0">Best and second-best per backbone in <b>bold</b> and <u>underline</u>; highlighting does not imply statistical significance. ComCLIP and CLIP-Refine train for 1 epoch, KUEA for 2 (its default). MMVP has only 135 image pairs (one pair = 0.74 points), so we draw MMVP conclusions only from multi-seed comparisons.</p>
+
+      <div class="results-grid">
+        <figure class="radar" style="margin:0">
+          <img src="static/images/radar.png" alt="Radar chart comparing OpenAI CLIP, KUEA, CLIP-Refine and ComCLIP on ViT-L/14 across zero-shot classification, retrieval, linear probing and MMVP.">
+        </figure>
+      <div class="callouts">
+        <div class="callout"><b>The linear-probe gain is not a data artifact</b><span>With matched training data, ComCLIP still leads CLIP-Refine on linear probing: +4.10 on ViT-B/16 (both on CC3M) and +7.45 on ViT-L/14 (both on COCO Caption).</span></div>
+        <div class="callout"><b>MMVP improves on ViT-L/14</b><span>Over 3 seeds with both methods trained on CC3M, ComCLIP reaches 24.20&plusmn;0.86 against CLIP-Refine's 19.01&plusmn;1.86 (Welch \(p = 0.025\)).</span></div>
+      </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="llava">
+    <div class="wrap">
+      <div class="narrow">
+        <h2><span class="kicker">Downstream</span>A drop-in vision encoder for LLaVA-1.5</h2>
+        <p>We swap LLaVA-1.5-7B's vision encoder for each post-trained ViT-L/14 and keep the projector and LLM <b>frozen</b>. ComCLIP produces no net change against the original CLIP (mean relative change +0.02%), while KUEA and CLIP-Refine each degrade 6 of the 9 scores. The refinement keeps downstream compatibility intact. It does not by itself improve VLM accuracy without re-alignment.</p>
+      </div>
+      <div class="table-wrap">
+        <table class="compact">
+          <thead>
+            <tr><th>Vision encoder</th><th>Rel.&nbsp;&Delta;</th><th>W/T/L</th><th>AI2D</th><th>POPE</th><th>RefCOCOg</th><th>V*</th><th>MME-c</th><th>MME-p</th><th>SQA-Img</th><th>OCRBench</th><th>TextVQA</th></tr>
+          </thead>
+          <tbody>
+            <tr class="base"><td>OpenAI CLIP</td><td class="dash">&ndash;</td><td class="dash">&ndash;</td><td><b>52.75</b></td><td>85.20</td><td><b>20.67</b></td><td><b>41.36</b></td><td><b>320.00</b></td><td>1350.79</td><td>67.63</td><td>27.80</td><td>34.57</td></tr>
+            <tr><td>KUEA</td><td class="down">&minus;1.23%</td><td>3/0/6</td><td>52.30</td><td>85.46</td><td>20.50</td><td>38.74</td><td>317.14</td><td>1350.82</td><td>66.68</td><td>27.40</td><td>34.69</td></tr>
+            <tr><td>CLIP-Refine</td><td class="down">&minus;0.95%</td><td>3/0/6</td><td>52.20</td><td><b>85.57</b></td><td>20.61</td><td>39.79</td><td>308.21</td><td>1345.97</td><td>67.72</td><td>27.60</td><td>34.84</td></tr>
+            <tr class="ours"><td>ComCLIP</td><td class="up">+0.02%</td><td>4/2/3</td><td><b>52.75</b></td><td>85.14</td><td>20.63</td><td><b>41.36</b></td><td>307.50</td><td><b>1373.47</b></td><td><b>67.82</b></td><td><b>28.20</b></td><td><b>34.89</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="caption" style="margin-left:0">LLaVA-1.5-7B with a swapped ViT-L/14 encoder; LLM and projector frozen. Rel.&nbsp;&Delta; is the mean per-benchmark relative change against OpenAI CLIP; W/T/L counts improved/tied/degraded scores. Best per column in bold.</p>
+    </div>
+  </section>
+
+  <section id="limitations">
+    <div class="wrap narrow">
+      <h2><span class="kicker">Scope</span>Limitations</h2>
+      <ul class="limits">
+        <li>ComCLIP targets CLIP-like models with a shared image-text contrastive space. The temperature analysis covers InfoNCE only, not CLIP-Refine's KL-based self-distillation or SigLIP's sigmoid loss.</li>
+        <li>MMVP has only 135 pairs and large seed variance. The MMVP gain over CLIP-Refine is significant only on ViT-L/14, and generative enhancement methods report higher MMVP.</li>
+        <li>Downstream evaluation uses one VLM configuration (LLaVA-1.5-7B with a frozen projector and LLM). Whether re-alignment turns the linear-probe gains into VLM gains is untested.</li>
+        <li>Gains are not monotone in corpus size (CC12M is not better than CC3M on linear probing), and training runs a frozen CLIP copy and a DINOv2 teacher forward at every step.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="bibtex">
+    <div class="wrap narrow">
+      <h2>BibTeX</h2>
+      <div class="bib">
+        <button class="copy" id="copyBib">Copy</button>
+<pre><code id="bibText">@inproceedings{wang2026rethinking,
+  title     = {Rethinking Contrastive Loss in CLIP Post-training: A Complementary Framework with Frozen Text Encoder},
+  author    = {Wang, Zidan and Li, Yaqian and Zhang, Xiaokai and Long, Kaiwen and He, Kun and Liu, Hanpeng},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2026}
+}</code></pre>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    Code and training scripts: <a href="https://github.com/showstarpro/ComCLIP">github.com/showstarpro/ComCLIP</a>
+  </div>
+</footer>
+
+<script>
+(function () {
+  // ---------- theme toggle ----------
+  var root = document.documentElement;
+  try { var saved = localStorage.getItem('comclip-theme'); if (saved) root.setAttribute('data-theme', saved); } catch (e) {}
+  document.getElementById('themeToggle').addEventListener('click', function () {
+    var cur = root.getAttribute('data-theme') ||
+      (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    var next = cur === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('comclip-theme', next); } catch (e) {}
+  });
+
+  // ---------- tabs ----------
+  var tabs = document.querySelectorAll('.tabs button');
+  tabs.forEach(function (b) {
+    b.addEventListener('click', function () {
+      tabs.forEach(function (o) { o.setAttribute('aria-selected', o === b ? 'true' : 'false'); });
+      document.querySelectorAll('[data-panel]').forEach(function (p) { p.hidden = p.dataset.panel !== b.dataset.tab; });
+    });
+  });
+
+  // ---------- copy bibtex ----------
+  document.getElementById('copyBib').addEventListener('click', function () {
+    var btn = this, txt = document.getElementById('bibText').textContent;
+    var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy'; }, 1500); };
+    if (navigator.clipboard) navigator.clipboard.writeText(txt).then(done, done); else done();
+  });
+
+  // ---------- charts ----------
+  var NS = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs, parent, text) {
+    var n = document.createElementNS(NS, tag);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    if (text != null) n.textContent = text;
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+  var Y_MIN = 57, Y_MAX = 64, BASE = 61.82;
+
+  function lineChart(id, cfg) {
+    var box = document.getElementById(id);
+    var svg = box.querySelector('svg');
+    var tip = box.querySelector('.tooltip');
+    var vb = svg.viewBox.baseVal, W = vb.width, H = vb.height;
+    var m = { l: 38, r: 16, t: 14, b: 44 };
+    var iw = W - m.l - m.r, ih = H - m.t - m.b;
+    var xs = cfg.x.map(Math.log);
+    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
+    var pad = (x1 - x0) * 0.06;
+    function X(v) { return m.l + (Math.log(v) - x0 + pad) / (x1 - x0 + 2 * pad) * iw; }
+    function Y(v) { return m.t + (Y_MAX - v) / (Y_MAX - Y_MIN) * ih; }
+
+    for (var g = Y_MIN; g <= Y_MAX; g++) {
+      el('line', { x1: m.l, x2: W - m.r, y1: Y(g), y2: Y(g), 'class': 'gridline' }, svg);
+      el('text', { x: m.l - 8, y: Y(g) + 4, 'text-anchor': 'end', 'class': 'tick' }, svg, g);
+    }
+    cfg.x.forEach(function (v, i) {
+      el('text', { x: X(v), y: H - m.b + 18, 'text-anchor': 'middle', 'class': 'tick' }, svg, cfg.xlabels[i]);
+    });
+    el('text', { x: m.l + iw / 2, y: H - 6, 'text-anchor': 'middle', 'class': 'axis-title' }, svg, cfg.xtitle);
+
+    el('line', { x1: m.l, x2: W - m.r, y1: Y(BASE), y2: Y(BASE), 'class': 'baseline-ref' }, svg);
+    el('text', { x: W - m.r, y: Y(BASE) + 15, 'text-anchor': 'end', 'class': 'baseline-label' }, svg, 'OpenAI CLIP 61.82');
+
+    var d = cfg.x.map(function (v, i) { return (i ? 'L' : 'M') + X(v).toFixed(1) + ' ' + Y(cfg.y[i]).toFixed(1); }).join(' ');
+    el('path', { d: d, 'class': 'series-line' }, svg);
+
+    cfg.x.forEach(function (v, i) {
+      var cx = X(v), cy = Y(cfg.y[i]);
+      var below = cfg.y[i] < BASE;
+      el('circle', { cx: cx, cy: cy, r: 4.5, 'class': 'series-dot' + (below ? ' bad' : '') }, svg);
+      if (cfg.label.indexOf(i) >= 0) {
+        var ly = below ? cy + 18 : cy - 11;
+        el('text', { x: cx, y: ly, 'text-anchor': i === 0 ? 'start' : 'middle', dx: i === 0 ? -4 : 0, 'class': 'point-label' }, svg, cfg.y[i].toFixed(2));
+      }
+      var hit = el('circle', { cx: cx, cy: cy, r: 18, 'class': 'hit' }, svg);
+      function show() {
+        var r = svg.getBoundingClientRect(), br = box.getBoundingClientRect();
+        var sx = r.width / W, sy = r.height / H;
+        var delta = cfg.y[i] - BASE;
+        tip.innerHTML = cfg.tipLabel(i) + '<br>Zero-shot <b>' + cfg.y[i].toFixed(2) + '</b> (' + (delta >= 0 ? '+' : '−') + Math.abs(delta).toFixed(2) + ' vs. CLIP)';
+        tip.style.left = (r.left - br.left + cx * sx) + 'px';
+        tip.style.top = (r.top - br.top + cy * sy) + 'px';
+        tip.style.opacity = 1;
+      }
+      hit.addEventListener('mouseenter', show);
+      hit.addEventListener('touchstart', show, { passive: true });
+      hit.addEventListener('mouseleave', function () { tip.style.opacity = 0; });
+    });
+  }
+
+  lineChart('chart-tau', {
+    x: [100 / 7, 100 / 3, 50, 100, 100 / 0.7, 200],
+    xlabels: ['0.07', '0.03', '0.02', '0.01', '0.007', '0.005'],
+    xtitle: 'temperature τ (log scale of 1/τ)',
+    y: [57.90, 61.51, 62.57, 62.90, 62.72, 62.36],
+    label: [0, 3],
+    tipLabel: function (i) { return 'τ = ' + ['0.07', '0.03', '0.02', '0.01', '0.007', '0.005'][i] + ' (1/τ ≈ ' + [14, 33, 50, 100, 142, 200][i] + ')'; }
+  });
+  lineChart('chart-bs', {
+    x: [128, 256, 512, 1024, 2048],
+    xlabels: ['128', '256', '512', '1,024', '2,048'],
+    xtitle: 'global batch size (log scale)',
+    y: [62.00, 62.50, 62.65, 62.69, 63.03],
+    label: [0, 4],
+    tipLabel: function (i) { return 'Batch ' + ['128', '256', '512', '1,024', '2,048'][i] + ', τ = 0.01'; }
+  });
+
+  // ---------- math ----------
+  function renderMath() {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [{ left: '$$', right: '$$', display: true }, { left: '\\(', right: '\\)', display: false }],
+        throwOnError: false
+      });
+    }
+  }
+  if (document.readyState === 'complete') renderMath(); else window.addEventListener('load', renderMath);
+})();
+</script>
+</body>
+</html>
