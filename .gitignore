@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Checkpoints and weights
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.whl
+
+# Training / evaluation outputs
+wandb/
+/output/
+/results/
+CLIP_benchmark/output/
+CLIP_benchmark/results/
+CLIP_benchmark/datasets/
+*.csv
+!CLIP_benchmark/benchmark/*.csv
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store

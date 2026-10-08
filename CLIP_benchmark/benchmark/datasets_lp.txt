@@ -1,0 +1,5 @@
+wds/vtab/svhn
+wds/gtsrb
+wds/vtab/clevr_closest_object_distance
+wds/vtab/clevr_count_all
+wds/imagenet1k
