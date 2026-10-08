@@ -4,6 +4,8 @@ Official implementation of the NeurIPS 2026 paper
 **Rethinking Contrastive Loss in CLIP Post-training: A Complementary Framework with Frozen Text Encoder**
 by Zidan Wang, Yaqian Li, Xiaokai Zhang, Kaiwen Long, Kun He, and Hanpeng Liu.
 
+[[Project Page]](https://showstarpro.github.io/ComCLIP/) [[Paper]](https://showstarpro.github.io/ComCLIP/static/ComCLIP_NeurIPS2026.pdf)
+
 <p align="center">
   <img src="asset/framework.png" width="900">
 </p>
