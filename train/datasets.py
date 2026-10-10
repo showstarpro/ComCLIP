@@ -107,7 +107,7 @@ class COCOCaptionDataset(Dataset):
 #         .rename(image="jpg;png;jpeg;webp", text="txt")
 #         .map_dict(
 #             image=transform,
-#             text=lambda t: tokenizer(t)[0]  # [0] 去掉 batch 维，shape: (seq_len,)
+#             text=lambda t: tokenizer(t)[0]  # [0] drops the batch dim, shape: (seq_len,)
 #         )
 #         .to_tuple("image", "text")
 #         .batched(batch_size, partial=False)
@@ -119,7 +119,7 @@ class COCOCaptionDataset(Dataset):
 def make_wds_dataset(shards_path, transform, batch_size, steps_per_gpu, tokenizer):
 
     def is_valid_sample(sample):
-        """过滤缺失字段的样本"""
+        """Filter out samples with missing fields"""
         return "jpg" in sample or "png" in sample or "jpeg" in sample or "webp" in sample
 
     dataset = (
@@ -128,26 +128,26 @@ def make_wds_dataset(shards_path, transform, batch_size, steps_per_gpu, tokenize
             shardshuffle=True,
             nodesplitter=wds.split_by_node,
             resampled=True,
-            handler=wds.warn_and_continue,      # ① shard 级别出错跳过
+            handler=wds.warn_and_continue,      # (1) skip shard-level errors
         )
         .shuffle(1000)
-        .select(is_valid_sample)                # ② 过滤没有图片字段的样本
+        .select(is_valid_sample)                # (2) drop samples without an image field
         .decode(
             "pil",
-            handler=wds.warn_and_continue       # ③ 截断/损坏图片跳过
+            handler=wds.warn_and_continue       # (3) skip truncated/corrupted images
         )
         .rename(
             image="jpg;png;jpeg;webp",
             text="txt",
-            handler=wds.warn_and_continue       # ④ 字段缺失跳过
+            handler=wds.warn_and_continue       # (4) skip samples with missing fields
         )
         .map_dict(
             image=transform,
             text=lambda t: tokenizer(t)[0],
-            handler=wds.warn_and_continue       # ⑤ transform/tokenize 异常跳过
+            handler=wds.warn_and_continue       # (5) skip transform/tokenize errors
         )
         .to_tuple("image", "text")
         .batched(batch_size, partial=False)
-        .with_epoch(steps_per_gpu)              # ⑥ 循环读取，保证每epoch有足够样本
+        .with_epoch(steps_per_gpu)              # (6) resample so each epoch has enough samples
     )
     return dataset

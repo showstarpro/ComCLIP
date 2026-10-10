@@ -1,9 +1,9 @@
-数据集根目录结构
---dataset_root 传入的是模板：../CLIP_benchmark/datasets/wds_{dataset_cleaned}
+Dataset root directory layout
+--dataset_root takes a template: ../CLIP_benchmark/datasets/wds_{dataset_cleaned}
 
-对于 datasets.txt 中的每个数据集，实际展开后的路径如下：
+For each dataset in datasets.txt, the expanded path is:
 
-datasets.txt 中的名称	{dataset_cleaned}	实际路径
+Name in datasets.txt	{dataset_cleaned}	Actual path
 wds/vtab/cifar10	wds-vtab-cifar10	CLIP_benchmark/datasets/wds_wds-vtab-cifar10/
 wds/vtab/cifar100	wds-vtab-cifar100	CLIP_benchmark/datasets/wds_wds-vtab-cifar100/
 wds/vtab/caltech101	wds-vtab-caltech101	CLIP_benchmark/datasets/wds_wds-vtab-caltech101/
@@ -15,7 +15,7 @@ wds/vtab/eurosat	wds-vtab-eurosat	CLIP_benchmark/datasets/wds_wds-vtab-eurosat/
 wds/vtab/pcam	wds-vtab-pcam	CLIP_benchmark/datasets/wds_wds-vtab-pcam/
 wds/imagenet_sketch	wds-imagenet_sketch	CLIP_benchmark/datasets/wds_wds-imagenet_sketch/
 wds/imagenet-o	wds-imagenet-o	CLIP_benchmark/datasets/wds_wds-imagenet-o/
-所以 datasets/ 目录应该长这样
+So the datasets/ directory should look like this:
 
 CLIP_benchmark/datasets/
 ├── wds_wds-vtab-cifar10/
@@ -34,4 +34,4 @@ CLIP_benchmark/datasets/
 ├── wds_wds-vtab-pcam/
 ├── wds_wds-imagenet_sketch/
 └── wds_wds-imagenet-o/
-每个子目录里存放的是 WebDataset (wds) 格式的 .tar 分片文件。这是 clip_benchmark 使用的标准数据格式。
+Each subdirectory holds .tar shards in WebDataset (wds) format, the standard data format used by clip_benchmark.

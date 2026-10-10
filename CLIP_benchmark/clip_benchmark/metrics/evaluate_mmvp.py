@@ -55,7 +55,7 @@ def main(model_name, pretrained, benchmark_dir, load_full_model=False):
         else:
             has_visual_prefix = any(k.startswith('visual.') for k in state_dict.keys())
             if has_visual_prefix:
-                # 完整 CLIP checkpoint → 提取 visual 部分并去掉 visual. 前缀
+                # Full CLIP checkpoint -> extract the visual part and strip the 'visual.' prefix
                 visual_state_dict = {
                     k.replace('visual.', ''): v 
                     for k, v in state_dict.items() 

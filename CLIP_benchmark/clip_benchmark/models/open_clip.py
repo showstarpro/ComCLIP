@@ -52,11 +52,11 @@ def load_open_clip(model_name: str = "ViT-B-32-quickgelu", pretrained: str = "la
                     # tecoa checkpoint
                     model.visual.load_state_dict(checkpoint['vision_encoder_state_dict'])
                 else:
-                    # 判断 checkpoint 是纯 visual 还是完整 CLIP
+                    # Check whether the checkpoint is visual-only or a full CLIP model
                     has_visual_prefix = any(k.startswith('visual.') for k in checkpoint.keys())
                     
                     if has_visual_prefix:
-                        # 完整 CLIP checkpoint → 提取 visual 部分并去掉 visual. 前缀
+                        # Full CLIP checkpoint -> extract the visual part and strip the 'visual.' prefix
                         visual_state_dict = {
                             k.replace('visual.', ''): v 
                             for k, v in checkpoint.items() 
@@ -65,7 +65,7 @@ def load_open_clip(model_name: str = "ViT-B-32-quickgelu", pretrained: str = "la
                         model.visual.load_state_dict(visual_state_dict)
                         print(f"  Extracted {len(visual_state_dict)} visual keys from full CLIP checkpoint")
                     else:
-                        # 纯 visual encoder checkpoint（没有 visual. 前缀）
+                        # Visual-encoder-only checkpoint (no 'visual.' prefix)
                         model.visual.load_state_dict(checkpoint)
         # model.eval()
         model = model.to(device)
@@ -148,11 +148,11 @@ def load_open_clip(model_name: str = "ViT-B-32-quickgelu", pretrained: str = "la
                 # tecoa checkpoint
                 model.visual.load_state_dict(checkpoint['vision_encoder_state_dict'])
             else:
-                # 判断 checkpoint 是纯 visual 还是完整 CLIP
+                # Check whether the checkpoint is visual-only or a full CLIP model
                 has_visual_prefix = any(k.startswith('visual.') for k in checkpoint.keys())
                 
                 if has_visual_prefix:
-                    # 完整 CLIP checkpoint → 提取 visual 部分并去掉 visual. 前缀
+                    # Full CLIP checkpoint -> extract the visual part and strip the 'visual.' prefix
                     visual_state_dict = {
                         k.replace('visual.', ''): v 
                         for k, v in checkpoint.items() 
@@ -161,7 +161,7 @@ def load_open_clip(model_name: str = "ViT-B-32-quickgelu", pretrained: str = "la
                     model.visual.load_state_dict(visual_state_dict)
                     print(f"  Extracted {len(visual_state_dict)} visual keys from full CLIP checkpoint")
                 else:
-                    # 纯 visual encoder checkpoint（没有 visual. 前缀）
+                    # Visual-encoder-only checkpoint (no 'visual.' prefix)
                     model.visual.load_state_dict(checkpoint)
     except Exception as e:
         print(f'error: {e}', file=sys.stderr)

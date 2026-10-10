@@ -1,7 +1,7 @@
 #!/bin/bash
-# 将 /path/to/data 下的 clip-benchmark 数据集软链接到 clip_benchmark 期望的目录格式
-# 期望格式: CLIP_benchmark/datasets/wds_wds-{name}/  (内含 .tar 文件)
-# 源格式:   /path/to/data/clip-benchmark__wds_{name}/{branch}/
+# Symlink the clip-benchmark datasets under /path/to/data into the directory layout expected by clip_benchmark
+# Expected layout: CLIP_benchmark/datasets/wds_wds-{name}/  (containing .tar files)
+# Source layout:   /path/to/data/clip-benchmark__wds_{name}/{branch}/
 
 set -e
 
@@ -10,8 +10,8 @@ SRC_BASE="/path/to/data"
 
 mkdir -p "$DEST_DIR"
 
-# 定义映射: dataset_cleaned -> 源数据集目录名
-# 格式: "cleaned_name:source_dir_name:branch"
+# Mapping: dataset_cleaned -> source dataset directory name
+# Format: "cleaned_name:source_dir_name:branch"
 DATASETS=(
     "vtab-cifar10:clip-benchmark__wds_vtab-cifar10:main"
     "vtab-cifar100:clip-benchmark__wds_vtab-cifar100:main"

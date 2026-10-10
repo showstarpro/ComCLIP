@@ -229,9 +229,7 @@ def main(args):
     elif args.dataset == 'cc3m':
         assert args.wds_path != '', '--wds_path is required for cc3m dataset'
 
-        # 每个 GPU 每个 epoch 处理的样本数
         samples_per_gpu = args.wds_train_length // world_size
-        # 每个 GPU 的迭代步数（即 epoch 内的 batch 数）
         steps_per_gpu = samples_per_gpu // args.batch_size
         if args.clip_model_name == "SigLip":
             tokenizer = tokenizer
@@ -248,9 +246,7 @@ def main(args):
     elif args.dataset == 'cc12m':
         assert args.wds_path != '', '--wds_path is required for cc12m dataset'
 
-        # 每个 GPU 每个 epoch 处理的样本数
         samples_per_gpu = args.wds_train_length // world_size
-        # 每个 GPU 的迭代步数（即 epoch 内的 batch 数）
         steps_per_gpu = samples_per_gpu // args.batch_size
         if args.clip_model_name == "SigLip":
             tokenizer = tokenizer
@@ -285,7 +281,7 @@ def main(args):
         train_sampler = None
         dataloader = DataLoader(
             dataset,
-            batch_size=None,       # 已经在dataset内部batched，这里必须None
+            batch_size=None,
             num_workers=8,
             pin_memory=True,
         )
@@ -395,15 +391,6 @@ def main(args):
         logit_scale = torch.nn.parameter.Parameter(data=torch.ones([]) * init_val, requires_grad=True)
     else:
         logit_scale = torch.nn.parameter.Parameter(data=torch.ones([]) * init_val, requires_grad=False)
-    # if args.clip_model_name == "SigLip":
-    #     if args.bias_learn:
-    #         print('logit_bias is learned!')
-    #         logit_bias = torch.nn.parameter.Parameter(data=torch.ones([]) * init_bias, requires_grad=True)
-    #     else:
-    #         print('logit_bias is not learned!')
-    #         logit_bias = torch.nn.parameter.Parameter(data=torch.ones([]) * init_bias, requires_grad=False)
-    # else:
-    #     logit_bias = torch.nn.parameter.Parameter(data=torch.ones([]) * init_bias, requires_grad=False)
     param_groups = [
             {'params': unwrap_model(model).model.parameters(), 'weight_decay': args.wd},
             {'params': [projector_clip], 'weight_decay': 0},
@@ -628,17 +615,6 @@ def train_one_epoch(
                     rank=args.rank,
                     world_size=args.world_size,
                 )
-        # if args.kernel_dino == "gaussian":
-        #     k_dino = torch.cdist(embedding_dino, embedding_dino, p=2.0)
-        #     k_dino = torch.exp(-k_dino ** 2 / (2 * band_dino ** 2))
-        # elif args.kernel_dino == "polynomial":
-        #     n_feat = embedding_dino.shape[1]
-        #     k_dino = (embedding_dino @ embedding_dino.T / n_feat + 1.) ** 3
-        #     diag = k_dino.diag()
-        #     k_dino = k_dino / torch.sqrt(diag.view(-1, 1) @ diag.view(1, -1))
-        # elif args.kernel_dino == "cosine":
-        #     norm_X = embedding_dino / embedding_dino.norm(dim=1, keepdim=True)
-        #     k_dino = norm_X @ norm_X.T
 
         model.train()
 
@@ -653,7 +629,6 @@ def train_one_epoch(
             sync_context = contextlib.nullcontext()
 
         with sync_context:
-            # embedding_clean = model(data, output_normalize=args.output_normalize) # [B, D]
             if args.before_proj:
                 embedding_clean, embedding_clean_bp = model(data, output_normalize=args.output_normalize, before_proj=args.before_proj) # [B, D]
                 embedding_clean_norm = embedding_clean / embedding_clean.norm(dim=1, keepdim=True)
@@ -671,12 +646,6 @@ def train_one_epoch(
                         rank=args.rank,
                         world_size=args.world_size,
                     )
-            # print(f'clip img embedding shape: {embedding_clean_bp_gather.shape}')
-
-            # loss_clean = compute_loss(
-            #     loss_str=args.loss_clean, embedding=embedding_clean, targets=targets,
-            #     embedding_orig=embedding_orig, logit_scale=100., embedding_text_labels_norm=None
-            #     )
             if args.oriclip:
                 cur_logit_scale = logit_scale.exp()
                 if args.scale_learn:
@@ -685,22 +654,13 @@ def train_one_epoch(
                 else:
                     assert cur_logit_scale.requires_grad == False
                     # print("logit_scale can not be learned.")
-                # if args.clip_model_name == "SigLip":
-                #     # assert logit_bias.requires_grad == True
-                #     loss_clip = siglip_loss(embedding_clean_norm, embedding_clean_gather, embedding_orig_text_norm, embedding_orig_text_gather, args.device, logit_scale=cur_logit_scale, logit_bias=logit_bias)
-                # else:
                 loss_clip = clip_loss(embedding_clean_gather, embedding_orig_text_gather, args.device, logit_scale=cur_logit_scale)
             else:
-                # loss_klclip = kl_focal_weight_loss(embedding_clean_gather, embedding_orig_text_gather, args.T, args.g)
                 cur_logit_scale = logit_scale.exp()
                 if args.scale_learn:
                     assert cur_logit_scale.requires_grad == True
                 else:
                     assert cur_logit_scale.requires_grad == False
-                # if args.clip_model_name == "SigLip":
-                #     # assert logit_bias.requires_grad == True
-                #     loss_clip = siglip_loss(embedding_clean_norm, embedding_clean_gather, embedding_orig_text_norm, embedding_orig_text_gather, args.device, logit_scale=cur_logit_scale, logit_bias=logit_bias)
-                # else:
                 loss_clip = clip_loss(embedding_clean_gather, embedding_orig_text_gather, args.device, logit_scale=cur_logit_scale)
                 loss_fdimg = F.mse_loss(embedding_clean, embedding_orig)
                 if args.before_proj:
@@ -735,13 +695,6 @@ def train_one_epoch(
             optimizer.zero_grad()
             step_total += 1
             scheduler(step_total)
-        # loss_total.backward()
-        # if dist.is_initialized() and projector_clip.grad is not None:
-        #     dist.all_reduce(projector_clip.grad, op=dist.ReduceOp.AVG)
-        # optimizer.step()
-        # optimizer.zero_grad()
-        # step_total += 1
-        # scheduler(step_total)
 
         with torch.no_grad():
             # only for logging
@@ -776,18 +729,11 @@ def train_one_epoch(
             model.train()
             del data_eval, targets_eval, embedding_eval_norm, logits_eval
 
-        # lr_ = optimizer.param_groups[0].get('lr')
         if is_update_step and (step_total-1) % args.log_freq == 0 and is_main_process():
             lr_ = optimizer.param_groups[0].get('lr')
             if args.oriclip:
-                # if args.clip_model_name == "SigLip":
-                #     log_str = f'[step] {step_total} [lr] {lr_:.6f} [loss_clip] {loss.item():.6f} [logit_scale] {cur_logit_scale.item():.6f} [logit_bias] {logit_bias.item():.6f}'
-                # else:
                 log_str = f'[step] {step_total} [lr] {lr_:.6f} [loss_clip] {loss.item():.6f} [logit_scale] {cur_logit_scale.item():.6f}'
             else:
-                # if args.clip_model_name == "SigLip":
-                #     log_str = f'[step] {step_total} [lr] {lr_:.6f} [loss_clip] {loss.item():.6f} [loss_fdimg] {loss_fdimg.item():.6f} [loss_dinorkd] {loss_dinorkd.item():.6f} [logit_scale] {cur_logit_scale.item():.6f} [logit_bias] {logit_bias.item():.6f}'
-                # else:
                 log_str = f'[step] {step_total} [lr] {lr_:.6f} [loss_clip] {loss.item():.6f} [loss_fdimg] {loss_fdimg.item():.6f} [loss_dinorkd] {loss_dinorkd.item():.6f} [logit_scale] {cur_logit_scale.item():.6f}'
             if is_classification:
                 log_str += f' [acc] {acc:.2f}'
@@ -859,67 +805,20 @@ def compute_acc(logits, targets):
     acc = (preds_clean.eq(targets).sum() / targets.shape[0]).item() * 100
     return acc
 
-def kl_focal_weight_loss(feat_i, feat_t, T=1.0, gamma=3.0):
-    """
-    正确的“自适应难度”实现方式：
-    1. 内部温度 T 保持绝对统一 (例如 T=1.0)，维持特征空间的全局一致性。
-    2. 在外部利用 Focal Loss 的思想，根据正样本的相似度调整每一行的 Loss 权重。
-    - 高相似度 -> 权重趋近于 0 (不更新，防破坏)
-    - 低相似度 -> 权重加大 (重点更新这些未掌握的知识)
-    """
-    B = feat_i.shape[0]
-    logits_per_image = feat_i @ feat_t.T
-    logits_per_text = feat_t @ feat_i.T
-    
-    p_img = F.log_softmax(logits_per_image / T, dim=1)
-    p_txt = F.log_softmax(logits_per_text / T, dim=1)
-    
-    # 目标依然是 One-hot 标签
-    labels = torch.eye(B, device=feat_i.device, dtype=p_img.dtype)
-    
-    # 2. 计算基础的 KL Loss，这里不要用 reduction="batchmean"，而是 "none" 以便我们逐行加权
-    # loss_i_raw 形状为 (B, B)
-    loss_i_raw = F.kl_div(p_img, labels, reduction="none") * (T**2)
-    loss_t_raw = F.kl_div(p_txt, labels, reduction="none") * (T**2)
-    
-    # 将每一行的 Loss 求和，得到每个样本的 Loss: 形状 (B,)
-    loss_i_per_sample = loss_i_raw.sum(dim=1)
-    loss_t_per_sample = loss_t_raw.sum(dim=1)
-
-    # 3. 计算样本级权重 (不需要参与梯度计算，只作为权重)
-    with torch.no_grad():
-        # 获取正样本的余弦相似度 (对角线元素)，范围通常在 [0, 1] 之间
-        # 为了防止负数，可以做一个 relu 或者归一化
-        pos_sim = torch.diag(logits_per_image).clamp(min=0.0) 
-        # 构建 Focal Weight: (1 - similarity)^gamma
-        weights = (1.0 - pos_sim) ** gamma
-        
-        # 归一化权重，保证整个 Batch 的梯度总规模与原来大致相当
-        # 加 1e-6 防止分母为 0
-        weights = weights / (weights.mean() + 1e-6)
-
-    final_loss_i = (loss_i_per_sample * weights).mean()
-    final_loss_t = (loss_t_per_sample * weights).mean()
-    
-    return (final_loss_i + final_loss_t) / 2
 
 def dino_rkd_loss(clip_cls, dino_cls, T=0.1):
     """
-    clip_cls, dino_cls: 已经过 F.normalize() 的 (B, D) 向量
+    clip_cls, dino_cls
     """
-    # 1. 计算 Batch 内的自我相似度矩阵 (B, B)
     clip_cls = F.normalize(clip_cls, p=2, dim=-1)
     dino_cls = F.normalize(dino_cls, p=2, dim=-1)
     sim_clip = clip_cls @ clip_cls.T
     with torch.no_grad():
         sim_dino = dino_cls @ dino_cls.T
-        
-    # 2. 对相似度矩阵使用 Softmax 转化为关系概率分布
-    # temperature 可设为较小值(如0.1)使关系更尖锐
+
     prob_clip = F.log_softmax(sim_clip / T, dim=1)
     prob_dino = F.softmax(sim_dino / T, dim=1).detach()
     
-    # 3. 使用 KL 散度让 CLIP 拟合 DINO 的关系拓扑
     loss_rkd = F.kl_div(prob_clip, prob_dino, reduction='batchmean')
     return loss_rkd
 
@@ -933,32 +832,6 @@ def clip_loss(feat_i, feat_t, device, logit_scale=100.0):
     ) / 2
     return total_loss
 
-def siglip_loss(feat_i, feat_i_gather, feat_t, feat_t_gather, device, logit_scale=100.0, logit_bias=-10.0):
-    local_batch_size = feat_i.shape[0]
-    global_batch_size = feat_i_gather.shape[0]
-
-    logits_i2t = (feat_i @ feat_t_gather.t()) * logit_scale + logit_bias
-    logits_t2i = (feat_t @ feat_i_gather.t()) * logit_scale + logit_bias
-
-    labels = torch.ones((local_batch_size, global_batch_size), device=device) * (-1.0)
-
-    if dist.is_available() and dist.is_initialized():
-        rank = dist.get_rank()
-    else:
-        rank = 0
-
-    start_idx = rank * local_batch_size
-
-    local_indices = torch.arange(local_batch_size, device=device)
-    global_indices = torch.arange(start_idx, start_idx + local_batch_size, device=device)
-    labels[local_indices, global_indices] = 1.0
-
-    loss_i2t = -F.logsigmoid(labels * logits_i2t).mean()
-    loss_t2i = -F.logsigmoid(labels * logits_t2i).mean()
-
-    loss = (loss_i2t + loss_t2i) / 2.0
-    
-    return loss
 
 def compute_loss(loss_str, embedding, targets, embedding_orig, logit_scale,
                  embedding_text_labels_norm=None, reduction='mean'):
@@ -1046,10 +919,6 @@ def gather_features(
     return all_image_features, all_text_features, all_dino_features
 
 if __name__ == '__main__':
-    # # set seeds
-    # torch.manual_seed(0)
-    # np.random.seed(0)
-    # random.seed(0)
 
     # Parse command-line arguments
     args = parser.parse_args()
